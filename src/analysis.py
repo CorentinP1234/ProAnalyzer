@@ -14,6 +14,10 @@ def analysis():
     st.title('Analysis')
     if 'df' in st.session_state:
         df = st.session_state['df']
-        st.write(f'{df.shape}')
+        st.subheader(f'Nombre de d\'avis: {df.shape[0]}')
     else:
         st.write('No Data uploaded')
+
+
+def plot1():
+    ...
