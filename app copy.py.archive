@@ -1,0 +1,73 @@
+import streamlit as st
+from streamlit_option_menu import option_menu
+from src.about_us import about_us 
+from src.analysis import analysis 
+from src.home import home 
+from src.how_it_works import how_it_works 
+from src.login import login 
+from src.signup import signup 
+
+
+color_mapping = {
+    "joy": "gold",
+    "neutral": "darkgray",
+    "surprise": "orange",
+    "anger": "orangered",
+    "disgust": "green",
+    "fear": "darkviolet",
+    "sadness": "cornflowerblue",
+}
+
+def home():
+    st.title('Welcome to Our Application')
+    st.write("This is the home page of our application.")
+    
+def login():
+    st.title('Login to Your Account')
+    username = st.text_input("Username")
+    password = st.text_input("Password", type='password')
+    if st.button('Login'):
+        st.write("Implement login functionality here.")
+
+def how_it_works():
+    st.title('How It Works')
+    st.write("This is the page where we explain how our application works.")
+
+def about_us():
+    st.title('About Us')
+    st.write("This is the page where we introduce our team and mission.")
+        
+def analysis():
+    st.title('Analysis')
+    st.write("This page will showcase the results from our application.")
+    
+def signup():
+    st.title('Sign Up')
+    username = st.text_input("Username")
+    password = st.text_input("Password", type='password')
+    confirm_password = st.text_input("Confirm Password", type='password')
+    if st.button('Sign Up'):
+        st.write("Implement sign up functionality here.")
+
+def main():
+    selected = None
+    with st.sidebar:
+        selected = option_menu(
+            menu_title="Navigation",
+            options=["Home", "Analysis", "How it works", "About us"],
+        )
+
+    pages = {
+        "Home": home,
+        "Analysis": analysis,
+        "How it works": how_it_works,
+        "About us": about_us,
+        "Login": login,
+        "Sign Up": signup,
+    }
+
+    page = pages[selected]
+    page()
+
+if __name__ == "__main__":
+    main()
