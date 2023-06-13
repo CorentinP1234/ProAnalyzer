@@ -9,9 +9,7 @@ from src.signup import signup
 import pandas as pd
 
 def main():
-    filename = None
-
-    selected = None
+    st.set_page_config(layout="wide")
     with st.sidebar:
         selected = option_menu(
             menu_title="Pro Analyzer",
