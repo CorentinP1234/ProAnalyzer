@@ -17,4 +17,5 @@ def get_uploaded_file():
     uploaded_file = st.file_uploader("Choose a CSV file", type='csv')
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
+        st.session_state['name'] = uploaded_file.name[:-4]
         st.session_state['df'] = df

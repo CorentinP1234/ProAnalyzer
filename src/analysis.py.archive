@@ -1,0 +1,229 @@
+import streamlit as st
+import pandas as pd
+import streamlit as st
+from streamlit_tags import st_tags
+import re
+from annotated_text import  annotation
+from streamlit_extras.add_vertical_space import add_vertical_space
+from src.utils.plots import plot_sentiments_per_month_min_max, \
+                            plot_sentiments_distribution, \
+                            generate_sentiments_per_month
+
+
+# ----------------
+def write_review_w_keywords(title, text, rating, keywords, color):
+    keywords_lower = [keyword.lower() for keyword in keywords]
+
+    for keyword in keywords_lower:
+        if keyword in text.lower():
+            text = text.replace(keyword, str(annotation(keyword, "", color)))
+
+    write_review(title, text, rating)
+
+
+def write_review(title, text, rating=1, text_font_size=15):
+    stars = "★" * rating + "☆" * (5 - rating)
+    title_font_size = 25
+    stars_font_size = 20
+    gap_size = 5
+    border_color = "#555555"
+    text_color = "#FFFFFF"
+    padding_top = "2px"
+    padding_right = "15px"
+    padding_bottom = "5px"
+    padding_left = "15px"
+
+    review_html = f"""
+    <div style="background: linear-gradient(to right, #262730, #1f1c28); 
+                border-radius: 7px; 
+                padding: {padding_top} {padding_right} {padding_bottom} {padding_left}; 
+                border: 1px solid {border_color}; 
+                box-shadow: 0 4px 6px 0 hsla(0, 0%, 0%, 0.2);">
+        <div style="font-size: {title_font_size}px; color: {text_color};">
+            <span style="font-size: {stars_font_size}px; color: gold; padding-right: 10px;">
+                <strong>{stars}</strong>
+            </span>
+            <strong>{title}</strong>
+        </div>
+        <div style="margin-top: {gap_size}px;"></div>
+        <div style="font-size: {text_font_size}px; font-family: Arial, sans-serif; color: {text_color};">"{text}"</div>
+    </div>
+    """
+
+    st.markdown(review_html, unsafe_allow_html=True)
+
+
+# ----------------
+
+
+colors = {
+    # 'blue': '#3251ad',
+    "blue": "#0000FF",
+    "red": "#FF4B4B",
+    "green": "#31ab2b",
+}
+
+key = 0
+
+color_mapping_emotion = {
+    "joy": "gold",
+    "neutral": "darkgray",
+    "surprise": "orange",
+    "anger": "orangered",
+    "disgust": "green",
+    "fear": "darkviolet",
+    "sadness": "cornflowerblue",
+}
+
+color_mapping_sentiments = {"neg": "red", "pos": "green"}
+
+emotions = ["joy", "anger", "disgust", "fear", "surprise", "neutral", "sadness"]
+
+
+def analysis():
+    st.title("Analysis")
+    if "df" in st.session_state:
+        df = st.session_state["df"]
+        analysis_page(df)
+    else:
+        st.write("No Data uploaded")
+
+
+def analysis_page(df):
+    st.subheader(st.session_state["name"])
+    st.subheader(f"{df.shape[0]} reviews to analyse")
+
+    st.write("---")
+    st.header("Filter")
+
+    df_filtered, keywords = get_df_filtered(df, 3)
+    n = st.number_input(
+        "Number of helpful reviews to show", min_value=1, max_value=15, value=3
+    )
+    st.write("---")
+
+    display_top_helpful_comments(df_filtered, n, keywords)
+    st.write("---")
+    display_top_pos_neg_reviews(df_filtered, n, keywords)
+    st.write("---")
+
+    st.title("Emotions Analysis")
+    st.header("Emotions distribution")
+    plot_sentiments_distribution(df, emotions, color_mapping_emotion)
+    st.write("---")
+
+    st.header("Emotions per rating")
+    generate_sentiments_per_month(df, emotions, color_mapping_emotion, 1)
+    st.write("---")
+
+    st.title("Sentiments Analysis")
+    st.write("---")
+    st.header("Sentiments distribution")
+    plot_sentiments_distribution(df, ["pos", "neg"], color_mapping_sentiments)
+    st.write("---")
+
+    st.header("Sentiments per rating")
+    plot_sentiments_per_month_min_max(df, ["pos", "neg"], color_mapping_sentiments, 40)
+
+    highscore_sentiment(df)
+
+
+def get_df_filtered(df, key):
+    keywords_ = st_tags(
+        label="Enter Keywords:",
+        text="Press enter to add more",
+        value=[],
+        suggestions=["Price", "Product", "Sales"],
+        maxtags=4,
+        key=key,
+    )
+    keywords = [word.lower() for word in keywords_]
+
+    df = get_comments_with_keywords(df, keywords)
+    if df.empty:
+        st.write("There are no comments containing all the keywords.")
+    else:
+        st.write(f"{len(df)} comments found containing all the keywords.")
+
+    return df, keywords
+
+
+def get_comments_with_keywords(df, keywords=None):
+    if keywords:
+        for keyword in keywords:
+            df = df[
+                df["text"].str.contains(r"\b" + re.escape(keyword) + r"\b", case=False)
+            ]
+    return df
+
+
+def display_top_helpful_comments(df, n, keywords):
+    st.header(f"Top {n} helpful reviews according to the users")
+    top_comments = df.nlargest(n, "numHelpful")
+
+    for index, row in top_comments.iterrows():
+        title = row["title"].capitalize()
+        text = row["text"].replace("$", ":dollar:")
+        text = row["text"]
+        rating = int(row["rating"])
+        write_review_w_keywords(title, text, rating, keywords, colors["blue"])
+
+        numHelpful = row["numHelpful"]
+        helpfulText = f":green[{int(numHelpful)}] people found this review helpful"
+        st.write(f"{helpfulText}")
+
+
+
+def display_top_pos_neg_reviews(df, n, keywords):
+    top_pos_texts = df.nlargest(n, "pos")
+
+    st.header(f"Top {n} positive reviews")
+
+    for index, row in top_pos_texts.iterrows():
+        pos = row["pos"]
+        title = row["title"].capitalize()
+        text = row["text"].replace("$", ":dollar:")
+        rating = int(row["rating"])
+        write_review_w_keywords(title, text, rating, keywords, colors["green"])
+
+        posText = f"This review got a :green[{round(pos, 3)}] positive score."
+        st.write(posText)
+
+    top_neg_texts = df.nlargest(n, "neg")
+
+    st.header(f"Top {n} negative reviews")
+    for index, row in top_neg_texts.iterrows():
+        neg = row["neg"]
+        title = row["title"].capitalize()
+        text = row["text"].replace("$", ":dollar:")
+        rating = int(row["rating"])
+        write_review_w_keywords(title, text, rating, keywords, colors["red"])
+
+        negText = f"This review got a :red[{round(neg, 3)}] negative score."
+        st.write(negText)
+
+
+
+# ---
+
+
+
+# ------------------
+
+
+def highscore_sentiment(df):
+    for sentiment in emotions:
+        # Trier le DataFrame par le score de l'émotion en ordre décroissant
+        sorted_df = df.sort_values(by=sentiment, ascending=False)
+        # Obtenir la ligne avec le score le plus élevé pour l'émotion
+        if sentiment == "anger" or "fear" or "disgust":
+            filtered_df = sorted_df["joy"] < 0, 1
+        else:
+            filtered_df = sorted_df
+        top_scores = sorted_df.head(2)
+        # Afficher les informations de la ligne
+        st.subheader(f"{sentiment}")
+        st.write("------------------------")
+        for index, row in top_scores.iterrows():
+            comment = row["text"]
+            st.markdown(f">{comment}")

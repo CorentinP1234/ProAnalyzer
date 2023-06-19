@@ -1,12 +1,18 @@
-import streamlit as st
-import plotly.graph_objects as go
-from dateutil.relativedelta import relativedelta
-import inflect
+import re
 import pandas as pd
-import plotly.graph_objects as go
 import streamlit as st
+from streamlit_tags import st_tags
+from annotated_text import annotation
+from src.utils.plots import (
+    plot_sentiments_distribution, 
+    plot_sentiments_per_month_min_max, 
+    generate_sentiments_per_month
+)
 
-color_mapping_seven = {
+# Define color mappings and other constants
+COLORS = {"blue": "#0000FF", "red": "#FF4B4B", "green": "#31ab2b"}
+EMOTIONS = ["joy", "anger", "disgust", "fear", "surprise", "neutral", "sadness"]
+COLOR_MAPPING_EMOTION = {
     "joy": "gold",
     "neutral": "darkgray",
     "surprise": "orange",
@@ -15,329 +21,121 @@ color_mapping_seven = {
     "fear": "darkviolet",
     "sadness": "cornflowerblue",
 }
+COLOR_MAPPING_SENTIMENTS = {"negative": "red", "positive": "green"}
 
-color_mapping_pos_neg = {
-    'neg': 'red',
-    'pos': 'green'
-}
+# Define all the utility functions related to data filtering and text processing
+def get_comments_with_keywords(df, keywords):
+    for keyword in keywords:
+        df = df[df["text"].str.contains(r"\b" + re.escape(keyword) + r"\b", case=False)]
+    return df
 
-sentiments = ["joy", "anger", "disgust", "fear", "surprise", "neutral", "sadness"]
+def get_df_filtered(df, key):
+    keywords_ = st_tags(
+        label="Enter Keywords:",
+        text="Press enter to add more",
+        value=[],
+        suggestions=["Price", "Product", "Sales"],
+        maxtags=4,
+        key=key,
+    )
+    keywords = [word.lower() for word in keywords_]
+    df = get_comments_with_keywords(df, keywords)
+    st.write(f"{len(df)} comments found containing all the keywords." if df.empty else "There are no comments containing all the keywords.")
+    return df, keywords
+
+# Define all the utility functions related to review representation
+def write_review(title, text, rating=1, text_font_size=15):
+    stars = "★" * rating + "☆" * (5 - rating)
+    review_html = f"""
+    <div style="background: linear-gradient(to right, #262730, #1f1c28); 
+                border-radius: 7px; 
+                padding: 2px 15px 5px 15px; 
+                border: 1px solid #555555; 
+                box-shadow: 0 4px 6px 0 hsla(0, 0%, 0%, 0.2);">
+        <div style="font-size: 25px; color: #FFFFFF;">
+            <span style="font-size: 20px; color: gold; padding-right: 10px;">
+                <strong>{stars}</strong>
+            </span>
+            <strong>{title}</strong>
+        </div>
+        <div style="margin-top: 5px;"></div>
+        <div style="font-size: {text_font_size}px; font-family: Arial, sans-serif; color: #FFFFFF;">"{text}"</div>
+    </div>
+    """
+    st.markdown(review_html, unsafe_allow_html=True)
+
+def write_review_w_keywords(title, text, rating, keywords, color):
+    keywords_lower = [keyword.lower() for keyword in keywords]
+    for keyword in keywords_lower:
+        if keyword in text.lower():
+            text = text.replace(keyword, str(annotation(keyword, "", color)))
+    write_review(title, text, rating)
 
 
+# Define all the functions related to review display
+def display_top_helpful_comments(df, n, keywords):
+    st.header(f"Top {n} helpful reviews according to the users")
+    for index, row in df.nlargest(n, "numHelpful").iterrows():
+        title, text, rating = row["title"].capitalize(), row["text"], int(row["rating"])
+        write_review_w_keywords(title, text, rating, keywords, COLORS["blue"])
+        st.write(f":green[{int(row['numHelpful'])}] people found this review helpful")
+
+def display_top_pos_neg_reviews(df, n, keywords):
+    display_reviews(df.nlargest(n, "positive"), keywords, "positive", "green")
+    display_reviews(df.nlargest(n, "negative"), keywords, "negative", "red")
+
+def display_reviews(df, keywords, sentiment, color):
+    st.header(f"Top {len(df)} {sentiment} reviews")
+    for index, row in df.iterrows():
+        title, text, rating = row["title"].capitalize(), row["text"], int(row["rating"])
+        write_review_w_keywords(title, text, rating, keywords, COLORS[color])
+        st.write(f"This review got a :{color}[{round(row[sentiment], 3)}] {sentiment} score.")
+
+def display_emotions_sentiments_analysis(df):
+    st.title("Emotions Analysis")
+    st.header("Emotions distribution")
+    plot_sentiments_distribution(df, EMOTIONS, COLOR_MAPPING_EMOTION)
+    st.write("---")
+    st.header("Emotions per rating")
+    generate_sentiments_per_month(df, EMOTIONS, COLOR_MAPPING_EMOTION, 1)
+    st.write("---")
+    st.title("Sentiments Analysis")
+    st.write("---")
+    st.header("Sentiments distribution")
+    plot_sentiments_distribution(df, ["positive", "negative"], COLOR_MAPPING_SENTIMENTS)
+    st.write("---")
+    st.header("Sentiments per rating")
+    plot_sentiments_per_month_min_max(df, ["positive", "negative"], COLOR_MAPPING_SENTIMENTS, 40)
+
+def analysis_page(df):
+    st.subheader(st.session_state["name"])
+    st.subheader(f"{df.shape[0]} reviews to analyse")
+    st.write("---")
+
+    df_filtered, keywords = get_df_filtered(df, 3)
+    n = st.number_input("Number of helpful reviews to show", min_value=1, max_value=15, value=3)
+    st.write("---")
+
+    display_top_helpful_comments(df_filtered, n, keywords)
+    st.write("---")
+    display_top_pos_neg_reviews(df_filtered, n, keywords)
+    st.write("---")
+    display_emotions_sentiments_analysis(df)
+    st.write('---')
+    highscore_sentiment(df)
+
+# Entry point for the analysis
 def analysis():
     st.title("Analysis")
     if "df" in st.session_state:
         df = st.session_state["df"]
+        df = df.rename(columns={'pos': 'positive', 'neg': 'negative'})
         analysis_page(df)
     else:
         st.write("No Data uploaded")
 
-
-def analysis_page(df):
-    st.header(f"{df.shape[0]} reviews to analyse")
-    st.write('---')
-    n = 3
-    number_word = get_number_word(n)
-    st.header(f'The {number_word} Most Helpful Reviews')
-    print_top_helpful_comments(df, 3)
-
-    st.write("---")
-    st.subheader("Distribution des sentiments")
-    plot_sentiments_distribution(df)
-
-    st.write("---")
-    st.subheader("Sentiments par note")
-
-    generate_sentiments_per_month(df, sentiments, color_mapping_seven, 1)
-
-    st.write("---")
-    st.subheader("Sentiments par note")
-
-    generate_sentiments_per_month_min_max(df, ['pos', 'neg'], color_mapping_pos_neg, 4)
-
-    st.write('---')
-    display_max_values(df)
-    st.write("---")
-    highscore_sentiment(df)
-
-
-# ----
-def get_number_word(n):
-    p = inflect.engine()
-    return p.number_to_words(n).capitalize()
-
-def print_top_helpful_comments(df, n):
-    top_comments = df.nlargest(n, 'numHelpful')
-    
-    for index, row in top_comments.iterrows():
-        numHelpful = row['numHelpful']
-        helpfulText = f'**{int(numHelpful)}** people found this review helpful'
-        title = row['title'].capitalize()
-        title = f'##### {title}' 
-        text = row['text'].replace('$', ':dollar:')
-        text = f"> {text} \n > \n > {helpfulText}"
-        st.markdown(title)
-        st.write(text)
-        
-
-# ----
-def plot_sentiments_distribution(df):
-    mean_sentiments = df[sentiments].mean()
-
-    sentiment_df = mean_sentiments.reset_index()
-    sentiment_df.columns = ["sentiment", "mean"]
-
-    fig = go.Figure()
-
-    for sentiment in sentiment_df["sentiment"]:
-        fig.add_trace(
-            go.Bar(
-                x=[sentiment],
-                y=sentiment_df[sentiment_df["sentiment"] == sentiment]["mean"],
-                name=sentiment,
-                marker_color=color_mapping_seven[sentiment],
-            )
-        )
-
-    layout = go.Layout(
-        # title='Distribution des sentiments',
-        title="",
-        # title_x=0.7,
-        xaxis=dict(
-            title="",
-        ),
-        yaxis=dict(
-            title="Valeur Moyenne",
-        ),
-        autosize=True,
-        bargap=0.6,
-        margin=dict(t=20),
-    )
-
-    fig.update_layout(layout)
-    st.plotly_chart(fig)
-
-
-# ---
-
-import pandas as pd
-import streamlit as st
-
-def display_max_values(df):
-    # Get the top 3 texts with the highest 'neg' values
-    top_neg_texts = df.nlargest(3, 'neg')['text']
-
-    # Get the top 3 texts with the highest 'pos' values
-    top_pos_texts = df.nlargest(3, 'pos')['text']
-
-    # Display the top 'pos' texts
-    st.subheader("Top 3 positive texts:")
-    for i, text in enumerate(top_pos_texts, 1):
-        st.write(f"{i}. {text}")
-
-    # Display the top 'neg' texts
-    st.subheader("Top 3 negative texts:")
-    for i, text in enumerate(top_neg_texts, 1):
-        st.write(f"{i}. {text}")
-
-    
-
-
-
-# ---
-
-def generate_sentiments_per_month_min_max(df, sentiments, color_mapping, key):
-    df["date"] = pd.to_datetime(df["date"])
-
-    time_type = st.selectbox("Select Interval", ("Month", "Year"), key=key)
-    if time_type == "Month":
-        df["interval"] = df["date"].dt.to_period("M")
-    else:
-        df["interval"] = df["date"].dt.to_period("Y")
-
-    unique_intervals = sorted(df["interval"].unique().astype(str))
-    start_date = pd.to_datetime(unique_intervals[0]).to_pydatetime()
-    end_date = pd.to_datetime(unique_intervals[-1]).to_pydatetime()
-    five_months_prior_end_date = end_date - relativedelta(months=5)
-
-    date1, date2 = st.slider(
-        "Schedule your appointment:",
-        min_value=start_date,
-        max_value=end_date,
-        value=(five_months_prior_end_date, end_date),
-        key=key+1
-    )
-
-    start_interval = pd.Period(date1, time_type[0])
-    end_interval = pd.Period(date2, time_type[0])
-
-    df = df[(df["interval"] >= start_interval) & (df["interval"] <= end_interval)]
-
-    grouped_df = df.groupby("interval")[sentiments].mean().reset_index()
-
-    # Normalize the sentiment scores with min-max normalization
-    for sentiment in sentiments:
-        grouped_df[sentiment] = (grouped_df[sentiment] - grouped_df[sentiment].min()) / (grouped_df[sentiment].max() - grouped_df[sentiment].min())
-
-    grouped_df["interval"] = grouped_df["interval"].astype(str)
-
-    fig = go.Figure()
-
-    for sentiment in sentiments:
-        fig.add_trace(
-            go.Bar(
-                x=grouped_df["interval"],
-                y=grouped_df[sentiment],
-                name=sentiment,
-                marker_color=color_mapping[sentiment],
-            )
-        )
-
-    layout = go.Layout(
-        title=f"Sentiments by {time_type}",
-        xaxis=dict(title=time_type),
-        yaxis=dict(title="Trends"),
-        autosize=True,
-        bargap=0.6,
-        margin=dict(t=20),
-    )
-
-    fig.update_layout(layout)
-
-    col1, col2, col3, col4 = st.columns([1, 3, 1, 1])
-    with col1:
-        st.plotly_chart(fig)
-    with col3:
-        for sentiment in sentiments[:4]:
-            current_value = grouped_df[sentiment].iloc[-1]
-            previous_value = (
-                grouped_df[sentiment].iloc[-2]
-                if len(grouped_df[sentiment]) > 1
-                else current_value
-            )
-            delta = current_value - previous_value
-            st.metric(
-                label=f"{sentiment.capitalize()}",
-                value=f"{current_value:.2f}",
-                delta=f"{delta:.2f}",
-            )
-    with col4:
-        for sentiment in sentiments[4:]:
-            current_value = grouped_df[sentiment].iloc[-1]
-            previous_value = (
-                grouped_df[sentiment].iloc[-2]
-                if len(grouped_df[sentiment]) > 1
-                else current_value
-            )
-            delta = current_value - previous_value
-            st.metric(
-                label=f"{sentiment.capitalize()}",
-                value=f"{current_value:.2f}",
-                delta=f"{delta:.2f}",
-            )
-
-
-
-
-
-
-
-
-def generate_sentiments_per_month(df, sentiments, color_mapping, key):
-    df["date"] = pd.to_datetime(df["date"])
-
-    time_type = st.selectbox("Select Interval", ("Month", "Year"), key=key)
-    if time_type == "Month":
-        df["interval"] = df["date"].dt.to_period("M")
-    else:
-        df["interval"] = df["date"].dt.to_period("Y")
-
-    unique_intervals = sorted(df["interval"].unique().astype(str))
-    start_date = pd.to_datetime(unique_intervals[0]).to_pydatetime()
-    end_date = pd.to_datetime(unique_intervals[-1]).to_pydatetime()
-    five_months_prior_end_date = end_date - relativedelta(months=5)
-
-    date1, date2 = st.slider(
-        "Schedule your appointment:",
-        min_value=start_date,
-        max_value=end_date,
-        value=(five_months_prior_end_date, end_date),
-        key=key+1
-    )
-
-    start_interval = pd.Period(date1, time_type[0])
-    end_interval = pd.Period(date2, time_type[0])
-
-    df = df[(df["interval"] >= start_interval) & (df["interval"] <= end_interval)]
-
-    grouped_df = df.groupby("interval")[sentiments].mean().reset_index()
-
-    grouped_df["interval"] = grouped_df["interval"].astype(str)
-
-    fig = go.Figure()
-
-    for sentiment in sentiments:
-        fig.add_trace(
-            go.Bar(
-                x=grouped_df["interval"],
-                y=grouped_df[sentiment],
-                name=sentiment,
-                marker_color=color_mapping[sentiment],
-            )
-        )
-
-    layout = go.Layout(
-        title=f"Sentiments by {time_type}",
-        xaxis=dict(title=time_type),
-        yaxis=dict(title="Valeur Moyenne"),
-        autosize=True,
-        bargap=0.6,
-        margin=dict(t=20),
-    )
-
-    fig.update_layout(layout)
-
-    col1, col2, col3, col4 = st.columns([1, 3, 1, 1])
-    with col1:
-        st.plotly_chart(fig)
-    with col3:
-        for sentiment in sentiments[:4]:
-            current_value = grouped_df[sentiment].iloc[-1]
-            previous_value = (
-                grouped_df[sentiment].iloc[-2]
-                if len(grouped_df[sentiment]) > 1
-                else current_value
-            )
-            delta = current_value - previous_value
-            st.metric(
-                label=f"{sentiment.capitalize()}",
-                value=f"{current_value:.2f}",
-                delta=f"{delta:.2f}",
-            )
-    with col4:
-        for sentiment in sentiments[4:]:
-            current_value = grouped_df[sentiment].iloc[-1]
-            previous_value = (
-                grouped_df[sentiment].iloc[-2]
-                if len(grouped_df[sentiment]) > 1
-                else current_value
-            )
-            delta = current_value - previous_value
-            st.metric(
-                label=f"{sentiment.capitalize()}",
-                value=f"{current_value:.2f}",
-                delta=f"{delta:.2f}",
-            )
-
-
-
-
-
-# ------------------
-
-
 def highscore_sentiment(df):
-    for sentiment in sentiments:
+    for sentiment in EMOTIONS:
         # Trier le DataFrame par le score de l'émotion en ordre décroissant
         sorted_df = df.sort_values(by=sentiment, ascending=False)
         # Obtenir la ligne avec le score le plus élevé pour l'émotion
