@@ -1,15 +1,76 @@
 import re
+import sys
 import pandas as pd
 import streamlit as st
 from streamlit_tags import st_tags
 from annotated_text import annotation
+from transformers import pipeline
+import asyncio
+import torch
+import subprocess
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+from nltk.corpus import stopwords
+from sklearn.feature_extraction.text import TfidfVectorizer
 from src.utils.plots import (
     plot_sentiments_distribution, 
     plot_sentiments_per_month_min_max, 
     generate_sentiments_per_month
 )
+# ----------
+def bigrames(df):
+    data = df['text']
+    data = data.fillna('')
+    stop_words = stopwords.words('english')  # Utiliser stopwords.words('english') pour obtenir les stopwords
+    stop_words.extend(["product", "amazon", "fire", "kindle"])  # Ajouter les mots à la liste des stopwords
 
-# Define color mappings and other constants
+    vectorizer = TfidfVectorizer(stop_words=stop_words, ngram_range=(2, 2))
+    X = vectorizer.fit_transform(data)
+
+    feature_names = vectorizer.get_feature_names_out()
+    top_words = []
+
+    for idx, word in enumerate(feature_names):
+        score = X.getcol(idx).sum()
+        top_words.append((word, score))
+
+    top_words.sort(key=lambda x: x[1], reverse=True)
+    mots_pondérés = {word: score for word, score in top_words[:50]}
+    return mots_pondérés
+
+def monogramme(df):
+    df = pd.read_csv("comparatif_Fire Tablet, 7 Display, Wi-Fi, 8 GB.csv", low_memory=False)
+    print("check")
+    data = df[df['vaders_pos'] >= 0.25]['text']
+    data.fillna('', inplace=True)
+
+    stop_words = stopwords.words('english')  # Utiliser stopwords.words('english') pour obtenir les stopwords
+    stop_words.extend(["bought", "product", "amazon", "fire", "kindle", "echo", "alexa", "great", "use","good","love", "easy", "loves", "fast", "device", "best", "nice", "also", "everything"])  # Ajouter les mots à la liste des stopwords
+
+    vectorizer = TfidfVectorizer(stop_words=stop_words, ngram_range=(1, 1))
+    X = vectorizer.fit_transform(data)
+
+    feature_names = vectorizer.get_feature_names_out()
+    top_words = []
+
+    for idx, word in enumerate(feature_names):
+        score = X.getcol(idx).sum()
+        top_words.append((word, score))
+
+    top_words.sort(key=lambda x: x[1], reverse=True)
+
+    for word, score in top_words[:25]:
+        st.write(word, score)
+
+def generate_wordcloud(mots):
+    st.title("Nuage de mots")
+    wordcloud = WordCloud(width=800, height=400, background_color='black', relative_scaling=0.5, max_words=50, prefer_horizontal=0.7).generate_from_frequencies(mots)
+    plt.figure(figsize=(10, 5))
+    plt.imshow(wordcloud, interpolation='bilinear')
+    plt.axis('off')
+    st.pyplot(plt)
+# -------------
+
 COLORS = {"blue": "#0000FF", "red": "#FF4B4B", "green": "#31ab2b"}
 EMOTIONS = ["joy", "anger", "disgust", "fear", "surprise", "neutral", "sadness"]
 COLOR_MAPPING_EMOTION = {
@@ -23,7 +84,6 @@ COLOR_MAPPING_EMOTION = {
 }
 COLOR_MAPPING_SENTIMENTS = {"negative": "red", "positive": "green"}
 
-# Define all the utility functions related to data filtering and text processing
 def get_comments_with_keywords(df, keywords):
     for keyword in keywords:
         df = df[df["text"].str.contains(r"\b" + re.escape(keyword) + r"\b", case=False)]
@@ -43,7 +103,6 @@ def get_df_filtered(df, key):
     st.write(f"{len(df)} comments found containing all the keywords." if df.empty else "There are no comments containing all the keywords.")
     return df, keywords
 
-# Define all the utility functions related to review representation
 def write_review(title, text, rating=1, text_font_size=15):
     stars = "★" * rating + "☆" * (5 - rating)
     review_html = f"""
@@ -72,7 +131,6 @@ def write_review_w_keywords(title, text, rating, keywords, color):
     write_review(title, text, rating)
 
 
-# Define all the functions related to review display
 def display_top_helpful_comments(df, n, keywords):
     st.header(f"Top {n} helpful reviews according to the users")
     for index, row in df.nlargest(n, "numHelpful").iterrows():
@@ -91,6 +149,21 @@ def display_reviews(df, keywords, sentiment, color):
         write_review_w_keywords(title, text, rating, keywords, COLORS[color])
         st.write(f"This review got a :{color}[{round(row[sentiment], 3)}] {sentiment} score.")
 
+def model(df):
+    st.write(torch.cuda.is_available())
+    model_name = 'j-hartmann/emotion-english-distilroberta-base'
+
+    classifier = pipeline(
+        "text-classification",
+        model=model_name,
+        truncation=True,
+        top_k=None,
+        device=0
+    )
+    sentiment_scores = classifier((df['title']+ " " + df['text']).tolist())
+    st.write(sentiment_scores[:3])
+
+
 def display_emotions_sentiments_analysis(df):
     st.title("Emotions Analysis")
     st.header("Emotions distribution")
@@ -107,9 +180,15 @@ def display_emotions_sentiments_analysis(df):
     st.header("Sentiments per rating")
     plot_sentiments_per_month_min_max(df, ["positive", "negative"], COLOR_MAPPING_SENTIMENTS, 40)
 
+
+
 def analysis_page(df):
     st.subheader(st.session_state["name"])
     st.subheader(f"{df.shape[0]} reviews to analyse")
+    # model(df)
+    # results = subprocess.run([f"{sys.executable}", "src/model.py"], capture_output=True, text=True)
+    # st.write(results.stdout)
+    
     st.write("---")
 
     df_filtered, keywords = get_df_filtered(df, 3)
@@ -123,8 +202,10 @@ def analysis_page(df):
     display_emotions_sentiments_analysis(df)
     st.write('---')
     highscore_sentiment(df)
+    st.write('---')
+    mots = bigrames(df)
+    generate_wordcloud(mots)
 
-# Entry point for the analysis
 def analysis():
     st.title("Analysis")
     if "df" in st.session_state:
