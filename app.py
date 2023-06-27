@@ -6,6 +6,7 @@ from src.home import home
 from src.how_it_works import how_it_works 
 from src.login import login 
 from src.signup import signup 
+from src.test import test
 import pandas as pd
 
 def main():

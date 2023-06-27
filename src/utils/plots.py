@@ -63,38 +63,7 @@ def plot_sentiments_per_month_min_max(df, sentiments, color_mapping, key):
     )
 
     fig.update_layout(layout)
-
-    col1, col2, col3, col4 = st.columns([1, 3, 1, 1])
-    with col1:
-        st.plotly_chart(fig)
-    with col3:
-        for sentiment in sentiments[:4]:
-            current_value = grouped_df[sentiment].iloc[-1]
-            previous_value = (
-                grouped_df[sentiment].iloc[-2]
-                if len(grouped_df[sentiment]) > 1
-                else current_value
-            )
-            delta = current_value - previous_value
-            st.metric(
-                label=f"{sentiment.capitalize()}",
-                value=f"{current_value:.2f}",
-                delta=f"{delta:.2f}",
-            )
-    with col4:
-        for sentiment in sentiments[4:]:
-            current_value = grouped_df[sentiment].iloc[-1]
-            previous_value = (
-                grouped_df[sentiment].iloc[-2]
-                if len(grouped_df[sentiment]) > 1
-                else current_value
-            )
-            delta = current_value - previous_value
-            st.metric(
-                label=f"{sentiment.capitalize()}",
-                value=f"{current_value:.2f}",
-                delta=f"{delta:.2f}",
-            )
+    st.plotly_chart(fig)
 
 
 def plot_sentiments_distribution(df, sentiments, color_mapping):
@@ -187,36 +156,4 @@ def generate_sentiments_per_month(df, sentiments, color_mapping, key):
     )
 
     fig.update_layout(layout)
-
-    col1, col2, col3, col4 = st.columns([1, 3, 1, 1])
-    with col1:
-        st.plotly_chart(fig)
-    with col3:
-        for sentiment in sentiments[:4]:
-            current_value = grouped_df[sentiment].iloc[-1]
-            previous_value = (
-                grouped_df[sentiment].iloc[-2]
-                if len(grouped_df[sentiment]) > 1
-                else current_value
-            )
-            delta = current_value - previous_value
-            st.metric(
-                label=f"{sentiment.capitalize()}",
-                value=f"{current_value:.2f}",
-                delta=f"{delta:.2f}",
-            )
-    with col4:
-        for sentiment in sentiments[4:]:
-            current_value = grouped_df[sentiment].iloc[-1]
-            previous_value = (
-                grouped_df[sentiment].iloc[-2]
-                if len(grouped_df[sentiment]) > 1
-                else current_value
-            )
-            delta = current_value - previous_value
-            st.metric(
-                label=f"{sentiment.capitalize()}",
-                value=f"{current_value:.2f}",
-                delta=f"{delta:.2f}",
-            )
-
+    st.plotly_chart(fig)
