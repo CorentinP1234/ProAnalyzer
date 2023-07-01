@@ -65,7 +65,6 @@ def get_uploaded_file():
             st.write(f"Execution time: {execution_time} seconds")
 
         st.session_state['df'] = df_with_scores
-        st.write(df_with_scores.head())
 
 def modelize_raw(df, device_str):
     device = 0 if device_str == 'gpu' else -1

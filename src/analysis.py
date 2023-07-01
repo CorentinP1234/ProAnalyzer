@@ -20,32 +20,32 @@ from src.utils.plots import (
     generate_sentiments_per_month
 )
 
-def monogramme():
-    df = pd.read_csv("comparatif_Fire Tablet, 7 Display, Wi-Fi, 8 GB.csv", low_memory=False)
-    st.write('check')
-    data = df[df['roberta_neg'] >= 0.17]['text']
-    data.fillna('', inplace=True)
+# def monogramme():
+#     df = pd.read_csv("comparatif_Fire Tablet, 7 Display, Wi-Fi, 8 GB.csv", low_memory=False)
+#     st.write('check')
+#     data = df[df['roberta_neg'] >= 0.17]['text']
+#     data.fillna('', inplace=True)
 
-    stop_words = stopwords.words('english')
-    stop_words.extend(["product", "amazon", "fire", "kindle", "echo", "alexa", "great","easy", "loves", "device", "best", "nice", "also", "everything", "would", "really", "much","excellent","one", "two",'awesome',"first", "friday"])
+#     stop_words = stopwords.words('english')
+#     stop_words.extend(["product", "amazon", "fire", "kindle", "echo", "alexa", "great","easy", "loves", "device", "best", "nice", "also", "everything", "would", "really", "much","excellent","one", "two",'awesome',"first", "friday"])
 
-    vectorizer = TfidfVectorizer(stop_words=stop_words, ngram_range=(1, 1))
-    X = vectorizer.fit_transform(data)
-    feature_names = vectorizer.get_feature_names_out()
+#     vectorizer = TfidfVectorizer(stop_words=stop_words, ngram_range=(1, 1))
+#     X = vectorizer.fit_transform(data)
+#     feature_names = vectorizer.get_feature_names_out()
     
 
-    top_words = []
-    for idx, word in enumerate(feature_names):
-        score = X.getcol(idx).sum()
-        top_words.append((word, score))
-    top_words.sort(key=lambda x: x[1], reverse=True)
+#     top_words = []
+#     for idx, word in enumerate(feature_names):
+#         score = X.getcol(idx).sum()
+#         top_words.append((word, score))
+#     top_words.sort(key=lambda x: x[1], reverse=True)
     
-    mots = []
+#     mots = []
     
-    for word in top_words[:25]:
-        mots.append(word[0])
+#     for word in top_words[:25]:
+#         mots.append(word[0])
         
-    return (mots)
+#     return (mots)
 
 
 def polarisation_mots(mots):
@@ -269,7 +269,7 @@ def bigrames(df):
 
 def generate_wordcloud(mots):
     st.title("Nuage de mots")
-    wordcloud = WordCloud(width=800, height=400, background_color='black', relative_scaling=0.5, max_words=50, prefer_horizontal=0.7).generate_from_frequencies(mots)
+    wordcloud = WordCloud(width=800, height=400, background_color='white', relative_scaling=0.5, max_words=50, prefer_horizontal=0.7).generate_from_frequencies(mots)
     plt.figure(figsize=(10, 5))
     plt.imshow(wordcloud, interpolation='bilinear')
     plt.axis('off')
@@ -394,8 +394,8 @@ def analysis_page(df):
     plot_sentiments_per_month_min_max(df, ["roberta_pos", "roberta_neg"], COLOR_MAPPING_SENTIMENTS, 40)
     # display_emotions_sentiments_analysis(df)
     st.write('---')
-    # mots = bigrames(df)
-    # generate_wordcloud(mots)
+    mots = bigrames(df)
+    generate_wordcloud(mots)
 
 def analysis():
     st.title("Analysis")
