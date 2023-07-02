@@ -1,5 +1,7 @@
 import re
 import sys
+
+import nltk
 import pandas as pd
 import streamlit as st
 from streamlit_tags import st_tags
@@ -19,6 +21,9 @@ from src.utils.plots import (
     plot_sentiments_per_month_min_max, 
     generate_sentiments_per_month
 )
+
+
+nltk.download('stopwords')
 
 # def monogramme():
 #     df = pd.read_csv("comparatif_Fire Tablet, 7 Display, Wi-Fi, 8 GB.csv", low_memory=False)
@@ -398,6 +403,16 @@ def analysis_page(df):
     generate_wordcloud(mots)
 
 def analysis():
+    # --- CSS ---
+    page_bg_img = """
+        <style>
+            [class="main css-uf99v8 e1g8pov65"]{
+                background-color: #ffffff;
+            }
+        </style>
+        """
+    st.markdown(page_bg_img, unsafe_allow_html=True)
+    # --- CODE ---
     st.title("Analysis")
     if "df" in st.session_state:
         df = st.session_state["df"]

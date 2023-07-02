@@ -11,8 +11,39 @@ from nltk.sentiment import SentimentIntensityAnalyzer
 from tqdm.notebook import tqdm
 
 def home():
+    # --- CSS ---
+    page_bg_img = """
+    <style>
+        [class="main css-uf99v8 e1g8pov65"]{
+            background-color: #e5e5f7;
+            background-image: url("https://www.techrepublic.com/wp-content/uploads/2022/10/data-modeling-vs-data-analysis.jpeg");
+            background-size: cover;
+            opacity: 0.8;
+        }
+        [data-testid="stHeader"]{
+            background-color: rgba(0, 0, 0, 0);
+        }
+        [class="css-qcqlej e1g8pov63"]{
+            background-color: rgba(0, 0, 0, 0);
+        }
+        [class="css-erpbzb e1ewe7hr3"]{
+            right: 2rem;
+        }
+        [data-testid="stVerticalBlock"]{
+            text-align: center;
+        }
+        [class="css-10trblm eqr7zpz0"]{
+            color: #ffffff;
+        }
+        [class="css-gkp278 eqr7zpz4"]{
+            color: #ffffff;
+        }
+    </style>
+    """
+    st.markdown(page_bg_img, unsafe_allow_html=True)
+
+    # --- home ---
     st.title('Welcome to Our Application')
-    st.write("This is the home page of our application.")
     st.title("Charger les donnees depuis le dossier 'final_data'")
     get_uploaded_file()
 

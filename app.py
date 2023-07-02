@@ -10,13 +10,15 @@ from src.test import test
 import pandas as pd
 
 def main():
-    st.set_page_config(layout="wide")
+    selected = st.session_state['selected'] if 'selected' in st.session_state else 'Home'
+
+    st.set_page_config(layout="wide", page_title="ProAnalyzer")
     with st.sidebar:
         selected = option_menu(
             menu_title="Pro Analyzer",
-            options=["Home", "Analysis", "How it works", "About us"],
+            options=["Home", "Analysis", "How it works", "About us", "Login", "Sign Up"],
             menu_icon='bar-chart-fill',
-            icons=['house-fill', 'bar-chart-line-fill', 'question-circle-fill', 'info-circle-fill']
+            icons=['house-fill', 'bar-chart-line-fill', 'question-circle-fill', 'info-circle-fill', 'person-fill', 'person-plus-fill'],
         )
 
     pages = {
@@ -29,7 +31,9 @@ def main():
     }
 
     page = pages[selected]
+    st.session_state["selected"]=selected
     page()
+
 
 if __name__ == "__main__":
     main()
