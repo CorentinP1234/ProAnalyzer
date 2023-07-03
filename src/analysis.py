@@ -1,4 +1,5 @@
 import re
+import os
 import sys
 import pandas as pd
 import streamlit as st
@@ -13,6 +14,7 @@ from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 from nltk.corpus import stopwords
 import plotly.graph_objects as go
+import spacy
 from sklearn.feature_extraction.text import TfidfVectorizer
 from src.utils.plots import (
     plot_sentiments_distribution, 
@@ -20,44 +22,40 @@ from src.utils.plots import (
     generate_sentiments_per_month
 )
 
-# def monogramme():
-#     df = pd.read_csv("comparatif_Fire Tablet, 7 Display, Wi-Fi, 8 GB.csv", low_memory=False)
-#     st.write('check')
-#     data = df[df['roberta_neg'] >= 0.17]['text']
-#     data.fillna('', inplace=True)
-
-#     stop_words = stopwords.words('english')
-#     stop_words.extend(["product", "amazon", "fire", "kindle", "echo", "alexa", "great","easy", "loves", "device", "best", "nice", "also", "everything", "would", "really", "much","excellent","one", "two",'awesome',"first", "friday"])
-
-#     vectorizer = TfidfVectorizer(stop_words=stop_words, ngram_range=(1, 1))
-#     X = vectorizer.fit_transform(data)
-#     feature_names = vectorizer.get_feature_names_out()
+def monogramme(df):
+    nlp = spacy.load('en_core_web_sm') 
+    data = df[df['roberta_neg'] >= 0.17]['text']
+    data.fillna('', inplace=True)
     
+    filtered_texts = [" ".join([token.text for token in nlp(text) if token.pos_ in ["NOUN", "PROPN"]]) for text in data]
+    filtered_data = pd.Series(filtered_texts)
 
-#     top_words = []
-#     for idx, word in enumerate(feature_names):
-#         score = X.getcol(idx).sum()
-#         top_words.append((word, score))
-#     top_words.sort(key=lambda x: x[1], reverse=True)
+    stop_words = stopwords.words('english')
+    stop_words.extend(["product",'months', 'year', "amazon", "fire", "kindle", "echo", "alexa","however","get", "great","easy", "loves", "device", "best", "nice", "also", "everything", "would", "really", "much","excellent","one", "two",'awesome',"first", "friday", "good", "well","perfect","something","time","even","could","like","lot","happy","things","still","anyone","another","highly","definitely","day"])
+
+    vectorizer = TfidfVectorizer(stop_words=stop_words, ngram_range=(1, 1))
+    X = vectorizer.fit_transform(filtered_data)
+    feature_names = vectorizer.get_feature_names_out()
+
+
+    top_words = []
+    for idx, word in enumerate(feature_names):
+        score = X.getcol(idx).sum()
+        top_words.append((word, score))
+    top_words.sort(key=lambda x: x[1], reverse=True)
     
-#     mots = []
+    mots = []
     
-#     for word in top_words[:25]:
-#         mots.append(word[0])
+    for word in top_words[:25]:
+        mots.append(word[0])
         
-#     return (mots)
+    return (mots)
 
 
-def polarisation_mots(mots):
-    # Normalisation :
-    df = pd.read_csv("comparatif_Fire Tablet, 7 Display, Wi-Fi, 8 GB.csv", low_memory=False)
+def polarisation_mots(df , mots, polarity):
     df.fillna('', inplace=True)
-    st.write('check')
-    # scaler = MinMaxScaler()
-    # columns_to_normalize = df.columns[21:28]
-    # df[columns_to_normalize] = scaler.fit_transform(df[columns_to_normalize])
     
-    tab = np.array([['mots', 'pos', 'neu', 'neg']])
+    tab = [['mots', 'pos', 'neu', 'neg']]
     
     for mot in mots:
         count_pos = 0
@@ -66,156 +64,101 @@ def polarisation_mots(mots):
         for i, com in enumerate(df['text']):
             mot = str(mot)
             if mot in com:
-                if df.loc[i, 'rating'] == 5:
+                if df.loc[i, 'vaders_compound'] > 0.7:
+                    count_pos += 1
+                elif df.loc[i, 'vaders_compound'] < 0.3:
                     count_neg += 1
-            elif df.loc[i, 'rating'] == 1 or 2 or 3:
-                count_pos += 1
-            else :
-                count_neu += 1
-            # st.write(com, "=", count_pos, count_neg, count_neu)
+                else :
+                    count_neu += 1
         count = count_neg + count_pos + count_neu
-        if count == 0:
-            count = 0.00000001
-        new = [mot, count_pos/count, count_neu/count, count_neg/count]
-        tab = np.vstack((tab, new))
-        
-    # st.write(tab)
-    return tab
+        new = [mot, count_pos/count, count_neu/count, count_neg/count*3]
+        tab.append(new)
 
+    if polarity == 'negative':       
+        tab_sort = sorted(tab[1:], key=lambda x: x[3], reverse=True)
+    else:
+        tab_sort = sorted(tab[1:], key=lambda x: x[1], reverse=True)
+    return(tab_sort)
 
-# ----------
-def foo():
-    mots = ['chat', 'chien', 'maison', 'arbre', 'soleil', 'ordinateur', 'jardin', 'musique', 'voiture', 'plage']
-    scores = {
-        'chat': {'pos': 0.8, 'neutral': 0.1, 'neg': 0.1},
-        'chien': {'pos': 0.7, 'neutral': 0.2, 'neg': 0.1},
-        'maison': {'pos': 0.6, 'neutral': 0.3, 'neg': 0.1},
-        'arbre': {'pos': 0.5, 'neutral': 0.4, 'neg': 0.1},
-        'soleil': {'pos': 0.9, 'neutral': 0.05, 'neg': 0.05},
-        'ordinateur': {'pos': 0.3, 'neutral': 0.6, 'neg': 0.1},
-        'jardin': {'pos': 0.7, 'neutral': 0.2, 'neg': 0.1},
-        'musique': {'pos': 0.8, 'neutral': 0.1, 'neg': 0.1},
-        'voiture': {'pos': 0.4, 'neutral': 0.4, 'neg': 0.2},
-        'plage': {'pos': 0.9, 'neutral': 0.05, 'neg': 0.05}
-    }
-    style = """
-    <style>
-        .score-bar {
-            height: 100%;
-            border-radius: 5px;
-            margin-right: 4px;
-        }
-        .score-bar:last-child {
-            margin-right: 0;
-        }
-        .highlighted-text {
-            font-size: 18px;
-            font-weight: bold;
-        }
-        .legend-container {
-            display: flex;
-            flex-direction: row;
-            gap: 50px;
-        }
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .legend-color {
-            width: 20px;
-            height: 20px;
-            position: relative;
-            border-radius: 5px;
-            top: -6px;
-        }
-    </style>
-    """
-
-    st.markdown(style, unsafe_allow_html=True)
-    
-
-    for mot in mots:
-        if mot in scores:
-            pos_score = int(scores[mot]['pos'] * 100)
-            neutral_score = int(scores[mot]['neutral'] * 100)
-            neg_score = int(scores[mot]['neg'] * 100)
-            html_string = f"""
-            <div style="display: flex; align-items: center;">
-                <p class="highlighted-text" style="width: 120px; margin-right: 10px;">{mot.capitalize()}</p>
-                <div style="display: flex; width: 60%; height: 20px;">
-                    <div class="score-bar" style="background-color: green; width: {pos_score}%;"></div>
-                    <div class="score-bar" style="background-color: orange; width: {neutral_score}%;"></div>
-                    <div class="score-bar" style="background-color: red; width: {neg_score}%;"></div>
-                </div>
-            </div>
-            """
-            st.markdown(html_string, unsafe_allow_html=True)
-
-    html_legend = """
-        <div class="legend-container">
-            <div class="legend-item">
-                <div class="legend-color" style="background-color: green;"></div>
-                <p class="legend-text">Positif</p>
-            </div>
-            <div class="legend-item">
-                <div class="legend-color" style="background-color: orange;"></div>
-                <p class="legend-text">Neutre</p>
-            </div>
-            <div class="legend-item">
-                <div class="legend-color" style="background-color: red;"></div>
-                <p class="legend-text">Négatif</p>
-            </div>
-        </div>
-    """
-    st.write(html_legend, unsafe_allow_html=True)
-
-
-def foo2(scores):
+def generate_words_scores(scores):
     scores = scores[1:]
-    st.write(scores[0][1])
     
     style = """
     <style>
-        .score-bar {
-            height: 100%;
-            border-radius: 5px;
-            margin-right: 4px;
-        }
-        .score-bar:last-child {
-            margin-right: 0;
-        }
-        .highlighted-text {
-            font-size: 18px;
-            font-weight: bold;
-        }
-        .legend-container {
-            display: flex;
-            flex-direction: row;
-            gap: 50px;
-        }
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .legend-color {
-            width: 20px;
-            height: 20px;
-            position: relative;
-            border-radius: 5px;
-            top: -6px;
-        }
+    .score-bar {
+        height: 100%;
+        border-radius: 5px;
+        margin-right: 4px;
+        transition: width 0.10s ease-in-out;
+    }
+    .score-bar:last-child {
+        margin-right: 0;
+    }
+    .highlighted-text {
+        font-size: 18px;
+        font-weight: bold;
+    }
+    .legend-container {
+        display: flex;
+        flex-direction: row;
+        gap: 50px;
+    }
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .legend-color {
+        width: 20px;
+        height: 20px;
+        position: relative;
+        border-radius: 5px;
+        top: -6px;
+    }
     </style>
     """
+
+    # style = """
+    # <style>
+    #     .score-bar {
+    #         height: 100%;
+    #         border-radius: 5px;
+    #         margin-right: 4px;
+    #     }
+    #     .score-bar:last-child {
+    #         margin-right: 0;
+    #     }
+    #     .highlighted-text {
+    #         font-size: 18px;
+    #         font-weight: bold;
+    #     }
+    #     .legend-container {
+    #         display: flex;
+    #         flex-direction: row;
+    #         gap: 50px;
+    #     }
+    #     .legend-item {
+    #         display: flex;
+    #         align-items: center;
+    #         gap: 6px;
+    #     }
+    #     .legend-color {
+    #         width: 20px;
+    #         height: 20px;
+    #         position: relative;
+    #         border-radius: 5px;
+    #         top: -6px;
+    #     }
+    # </style>
+    # """
 
     st.markdown(style, unsafe_allow_html=True)
 
     for score in scores:
         mot = score[0]
-        pos_score = int(score[1] * 100)
-        neutral_score = int(score[2] * 100)
-        neg_score = int(score[3] * 100)
+        pos_score = int(float(score[1]) * 100)
+        neutral_score = int(float(score[2]) * 100)
+        neg_score = int(float(score[3]) * 100)
         html_string = f"""
         <div style="display: flex; align-items: center;">
             <p class="highlighted-text" style="width: 120px; margin-right: 10px;">{mot.capitalize()}</p>
@@ -226,26 +169,188 @@ def foo2(scores):
             </div>
         </div>
         """
+       
+
         st.markdown(html_string, unsafe_allow_html=True)
 
-    html_legend = """
-        <div class="legend-container">
-            <div class="legend-item">
-                <div class="legend-color" style="background-color: green;"></div>
-                <p class="legend-text">Positif</p>
+def generate_words_scores_gradient_pos(scores):
+    scores = scores[1:]
+
+    style = """
+    <style>
+        .score-bar {
+            height: 100%;
+        }
+        .score-bar:last-child {
+            margin-right: 0;
+        }
+        .highlighted-text {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .legend-container {
+            display: flex;
+            flex-direction: row;
+            gap: 50px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            position: relative;
+            border-radius: 5px;
+            top: -6px;
+        }
+        .percentage {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-left: 10px;
+        }
+    </style>
+    """
+
+    st.markdown(style, unsafe_allow_html=True)
+
+    for score in scores:
+        mot = score[0]
+        pos_score = int(float(score[1]) * 100)
+        neutral_score = int(float(score[2]) * 100)
+        neg_score = int(float(score[3]) * 100)
+
+        total = score[1] + score[2] + score[3]
+        normalized_pos = (score[1] / total) * 100
+        normalized_neu = (score[2] / total) * 100
+        normalized_neg = (score[3] / total) * 100
+        gap = 200
+
+        html_string = f"""
+        <div style="display: flex; align-items: center;">
+            <p class="highlighted-text" style="width: 120px; margin-right: 10px;">{mot.capitalize()}</p>
+            <div style="display: flex; width: 60%; height: 20px;">
+                <div class="score-bar" style="background: green; width: {pos_score}%;"></div>
+                <div class="score-bar" style="background: linear-gradient(to left, yellow, green); width: {gap}px;"></div>  
+                <div class="score-bar" style="background: linear-gradient(to left, orange, yellow); width: {gap}px;"></div>  
+                <div class="score-bar" style="background: orange; width: {neutral_score}%;"></div>
+                <div class="score-bar" style="background: linear-gradient(to left, red, orange); width: {gap}px;"></div>  
+                <div class="score-bar" style="background: red; width: {neg_score}%;"></div>
             </div>
-            <div class="legend-item">
-                <div class="legend-color" style="background-color: orange;"></div>
-                <p class="legend-text">Neutre</p>
-            </div>
-            <div class="legend-item">
-                <div class="legend-color" style="background-color: red;"></div>
-                <p class="legend-text">Négatif</p>
+            <div class="percentage">
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: green;"></div>
+                    <span>{normalized_pos:.1f}%</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: orange;"></div>
+                    <span>{normalized_neu:.1f}%</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: red;"></div>
+                    <span>{normalized_neg:.1f}%</span>
+                </div>
             </div>
         </div>
-    """
-    st.write(html_legend, unsafe_allow_html=True)
+        """
+       
+        st.markdown(html_string, unsafe_allow_html=True)
 
+def generate_words_scores_gradient_neg(scores):
+    scores = scores[1:]
+
+    style = """
+    <style>
+        .score-bar {
+            height: 100%;
+        }
+        .score-bar:last-child {
+            margin-right: 0;
+        }
+        .highlighted-text {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .legend-container {
+            display: flex;
+            flex-direction: row;
+            gap: 50px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            position: relative;
+            border-radius: 5px;
+            top: -6px;
+        }
+        .percentage {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-left: 10px;
+        }
+    </style>
+    """
+
+    st.markdown(style, unsafe_allow_html=True)
+
+    for score in scores:
+        mot = score[0]
+        pos_score = int(float(score[1]) * 100)
+        neutral_score = int(float(score[2]) * 100)
+        neg_score = int(float(score[3]) * 100)
+
+        total = score[1] + score[2] + score[3]
+        normalized_pos = (score[1] / total) * 100
+        normalized_neu = (score[2] / total) * 100
+        normalized_neg = (score[3] / total) * 100
+        gap = 200
+
+        html_string = f"""
+        <div style="display: flex; align-items: center;">
+            <p class="highlighted-text" style="width: 120px; margin-right: 10px;">{mot.capitalize()}</p>
+            <div style="display: flex; width: 60%; height: 20px;">
+                <div class="score-bar" style="background: red; width: {neg_score}%;"></div>
+                <div class="score-bar" style="background: linear-gradient(to right, red, orange); width: {gap}px;"></div>  
+                <div class="score-bar" style="background: orange; width: {neutral_score}%;"></div>
+                <div class="score-bar" style="background: linear-gradient(to right, orange, yellow); width: {gap}px;"></div>  
+                <div class="score-bar" style="background: linear-gradient(to right, yellow, green); width: {gap}px;"></div>  
+                <div class="score-bar" style="background: green; width: {pos_score}%;"></div>
+            </div>
+            <div class="percentage">
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: red;"></div>
+                    <span>{normalized_neg:.1f}%</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: orange;"></div>
+                    <span>{normalized_neu:.1f}%</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: green;"></div>
+                    <span>{normalized_pos:.1f}%</span>
+                </div>
+            </div>
+        </div>
+        """
+       
+        st.markdown(html_string, unsafe_allow_html=True)
+
+
+def get_top_words(scores, n):
+    sorted_scores = sorted(scores, key=lambda x: x[3], reverse=True)
+    top_words = [score[0] for score in sorted_scores[:n]]
+    return top_words
+
+
+# --------------------------------------------------------------------------------------------------
 
 def bigrames(df):
     data = df['text']
@@ -268,7 +373,8 @@ def bigrames(df):
     return mots_pondérés
 
 def generate_wordcloud(mots):
-    st.title("Nuage de mots")
+    st.title("Words clouds")
+    st.write('This word cloud provides an overview of how customers feel overall about the product')
     wordcloud = WordCloud(width=800, height=400, background_color='white', relative_scaling=0.5, max_words=50, prefer_horizontal=0.7).generate_from_frequencies(mots)
     plt.figure(figsize=(10, 5))
     plt.imshow(wordcloud, interpolation='bilinear')
@@ -294,29 +400,43 @@ def get_comments_with_keywords(df, keywords):
         df = df[df["text"].str.contains(r"\b" + re.escape(keyword) + r"\b", case=False)]
     return df
 
-def get_df_filtered(df, key):
+def get_df_filtered(df, key, words):
+    if 'keywords_' not in st.session_state:
+        st.session_state.keywords_ = []
+
+    cols = st.columns(len(words))
+
+    for i, word in enumerate(words):
+        if cols[i].button(f'Add "{word}"'):
+            st.session_state.keywords_.append(word)
+    
     keywords_ = st_tags(
-        label="Enter Keywords:",
+        label="Enter Keywords to filter reviews:",
         text="Press enter to add more",
-        value=[],
+        value=st.session_state.keywords_,
         suggestions=["Price", "Product", "Sales"],
         maxtags=4,
-        key=key,
     )
     keywords = [word.lower() for word in keywords_]
+    st.session_state.keywords_ = keywords_   # update session state
     df = get_comments_with_keywords(df, keywords)
-    st.write(f"{len(df)} comments found containing all the keywords." if df.empty else "There are no comments containing all the keywords.")
+
+    st.write(f"{len(df)} comments found containing all the keywords." if not(df.empty) else "There are no comments containing all the keywords.")
     return df, keywords
+
 
 def write_review(title, text, rating=1, text_font_size=15):
     stars = "★" * rating + "☆" * (5 - rating)
+    color = '#FFFFFF'
+
+    # <div style="background: linear-gradient(to right, #262730, #1f1c28); 
     review_html = f"""
-    <div style="background: linear-gradient(to right, #262730, #1f1c28); 
+    <div style="background: linear-gradient(to right, #a480f3, #7451bd);
                 border-radius: 7px; 
                 padding: 2px 15px 5px 15px; 
                 border: 1px solid #555555; 
                 box-shadow: 0 4px 6px 0 hsla(0, 0%, 0%, 0.2);">
-        <div style="font-size: 25px; color: #FFFFFF;">
+        <div style="font-size: 25px; color: {color};">
             <span style="font-size: 20px; color: gold; padding-right: 10px;">
                 <strong>{stars}</strong>
             </span>
@@ -337,7 +457,8 @@ def write_review_w_keywords(title, text, rating, keywords, color):
 
 
 def display_top_helpful_comments(df, n, keywords):
-    st.header(f"Top {n} helpful reviews according to the users")
+    st.write('')
+    st.subheader(f"Top {n} helpful reviews according to the users")
     for index, row in df.nlargest(n, "numHelpful").iterrows():
         title, text, rating = row["title"].capitalize(), row["text"], int(row["rating"])
         write_review_w_keywords(title, text, rating, keywords, COLORS["blue"])
@@ -349,55 +470,62 @@ def display_top_pos_neg_reviews(df, n, keywords):
 
 def display_reviews(df, keywords, sentiment, color):
     map = {'roberta_pos': 'positive', 'roberta_neg': 'negative'}
-    st.header(f"Top {len(df)} {sentiment} reviews")
+    st.write('')
+    st.subheader(f"Top {len(df)} {map[sentiment]} reviews")
     for index, row in df.iterrows():
         title, text, rating = row["title"].capitalize(), row["text"], int(row["rating"])
         write_review_w_keywords(title, text, rating, keywords, COLORS[color])
         st.write(f"This review got a :{color}[{round(row[sentiment], 3)}] {map[sentiment]} score.")
 
-def display_emotions_sentiments_analysis(df):
-    st.title("Emotions Analysis")
-    st.header("Emotions distribution")
-    plot_sentiments_distribution(df, EMOTIONS, COLOR_MAPPING_EMOTION)
-    st.write("---")
-    st.header("Emotions per rating")
-    generate_sentiments_per_month(df, EMOTIONS, COLOR_MAPPING_EMOTION, 1)
-    st.write("---")
-    st.title("Sentiments Analysis")
-    st.write("---")
-    st.header("Sentiments distribution")
-    plot_sentiments_distribution(df, ["positive", "negative"], COLOR_MAPPING_SENTIMENTS)
-    st.write("---")
-    st.header("Sentiments per rating")
-    plot_sentiments_per_month_min_max(df, ["positive", "negative"], COLOR_MAPPING_SENTIMENTS, 40)
-
-
-
 def analysis_page(df):
-    
-    st.subheader(st.session_state["name"])
+    name = st.session_state["name"]
+    st.subheader(name)
     st.subheader(f"{df.shape[0]} reviews to analyse")
+    st.write('---')
+    st.title("Words Cloud")
+    st.write('This word cloud provides an overview of how customers feel overall about the product')
+    image_path = os.path.join("word_clouds", name + ".png")
+    st.image(image_path)
+    
     st.write("---")
+    mots = monogramme(df)
+    st.subheader('Top positive words')
+    scores_pos = polarisation_mots(df, mots, 'positive')
+    generate_words_scores_gradient_pos(scores_pos[:10])
 
-    df_filtered, keywords = get_df_filtered(df, 3)
-    n = st.number_input("Number of helpful reviews to show", min_value=1, max_value=15, value=3)
-    st.write("---")
+    st.subheader('Top negative words')
+    scores_neg = polarisation_mots(df, mots, 'negative')
+    generate_words_scores_gradient_neg(scores_neg[:10])
+
+    best_words = get_top_words(scores_neg, 10)
+
+    st.write('---')
+
+    st.title('Custom Reviews Search')
+    df_filtered, keywords = get_df_filtered(df, 3, best_words)
+    n = st.number_input("Number of reviews to show for each category", min_value=1, max_value=15, value=3)
 
     display_top_helpful_comments(df_filtered, n, keywords)
-    st.write("---")
     display_top_pos_neg_reviews(df_filtered, n, keywords)
+
+
     st.write("---")
     st.header("Sentiments distribution")
     plot_sentiments_distribution(df, ["roberta_pos", "roberta_neg"], COLOR_MAPPING_SENTIMENTS)
     st.write("---")
     st.header("Sentiments per rating")
     plot_sentiments_per_month_min_max(df, ["roberta_pos", "roberta_neg"], COLOR_MAPPING_SENTIMENTS, 40)
-    # display_emotions_sentiments_analysis(df)
     st.write('---')
-    mots = bigrames(df)
-    generate_wordcloud(mots)
-
+    
 def analysis():
+    page_bg_img = """
+        <style>
+            [class="main css-uf99v8 e1g8pov65"]{
+                background-color: #ffffff;
+            }
+        </style>
+    """
+    st.markdown(page_bg_img, unsafe_allow_html=True)
     st.title("Analysis")
     if "df" in st.session_state:
         df = st.session_state["df"]

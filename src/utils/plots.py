@@ -3,11 +3,16 @@ from dateutil.relativedelta import relativedelta
 import streamlit as st
 import plotly.graph_objects as go
 
+import streamlit as st
+import pandas as pd
+import plotly.graph_objects as go
+from dateutil.relativedelta import relativedelta
 
 def plot_sentiments_per_month_min_max(df, sentiments, color_mapping, key):
+    map = {'roberta_pos': 'positive', 'roberta_neg': 'negative'}
     df["date"] = pd.to_datetime(df["date"])
 
-    time_type = st.selectbox("Select Interval", ("Month", "Year"), key=key)
+    time_type = st.selectbox("Select Interva type (month or year)", ("Month", "Year"), key=key)
     if time_type == "Month":
         df["interval"] = df["date"].dt.to_period("M")
     else:
@@ -16,15 +21,16 @@ def plot_sentiments_per_month_min_max(df, sentiments, color_mapping, key):
     unique_intervals = sorted(df["interval"].unique().astype(str))
     start_date = pd.to_datetime(unique_intervals[0]).to_pydatetime()
     end_date = pd.to_datetime(unique_intervals[-1]).to_pydatetime()
-    five_months_prior_end_date = end_date - relativedelta(months=5)
+    five_months_prior_end_date = end_date - relativedelta(months=10)
 
     date1, date2 = st.slider(
-        "Schedule your appointment:",
+        "Select an interval:",
         min_value=start_date,
         max_value=end_date,
         value=(five_months_prior_end_date, end_date),
         key=key + 1,
     )
+
 
     start_interval = pd.Period(date1, time_type[0])
     end_interval = pd.Period(date2, time_type[0])
@@ -33,6 +39,7 @@ def plot_sentiments_per_month_min_max(df, sentiments, color_mapping, key):
 
     grouped_df = df.groupby("interval")[sentiments].mean().reset_index()
 
+    st.markdown(f"\t**{len(df)}** reviews in this interval")
     # Normalize the sentiment scores with min-max normalization
     for sentiment in sentiments:
         grouped_df[sentiment] = (
@@ -48,7 +55,7 @@ def plot_sentiments_per_month_min_max(df, sentiments, color_mapping, key):
             go.Bar(
                 x=grouped_df["interval"],
                 y=grouped_df[sentiment],
-                name=sentiment,
+                name=map[sentiment],
                 marker_color=color_mapping[sentiment],
             )
         )
@@ -63,11 +70,19 @@ def plot_sentiments_per_month_min_max(df, sentiments, color_mapping, key):
     )
 
     fig.update_layout(layout)
+
     st.plotly_chart(fig)
+    
+
+
 
 
 def plot_sentiments_distribution(df, sentiments, color_mapping):
+    map = {'positive': 'roberta_pos', 'negative': 'roberta_neg'}
     mean_sentiments = df[sentiments].mean()
+    mean_sentiments.index = ['positive', 'negative']
+    sentiment = ['positive', 'negative']
+
 
     sentiment_df = mean_sentiments.reset_index()
     sentiment_df.columns = ["sentiment", "mean"]
@@ -80,7 +95,7 @@ def plot_sentiments_distribution(df, sentiments, color_mapping):
                 x=[sentiment],
                 y=sentiment_df[sentiment_df["sentiment"] == sentiment]["mean"],
                 name=sentiment,
-                marker_color=color_mapping[sentiment],
+                marker_color=color_mapping[map[sentiment]],
             )
         )
 
@@ -106,7 +121,7 @@ def plot_sentiments_distribution(df, sentiments, color_mapping):
 def generate_sentiments_per_month(df, sentiments, color_mapping, key):
     df["date"] = pd.to_datetime(df["date"])
 
-    time_type = st.selectbox("Select Interval", ("Month", "Year"), key=key)
+    time_type = st.selectbox("Select Interval Type", ("Month", "Year"), key=key)
     if time_type == "Month":
         df["interval"] = df["date"].dt.to_period("M")
     else:
@@ -118,7 +133,7 @@ def generate_sentiments_per_month(df, sentiments, color_mapping, key):
     five_months_prior_end_date = end_date - relativedelta(months=5)
 
     date1, date2 = st.slider(
-        "Schedule your appointment:",
+        "Select an interval :",
         min_value=start_date,
         max_value=end_date,
         value=(five_months_prior_end_date, end_date),
@@ -133,6 +148,8 @@ def generate_sentiments_per_month(df, sentiments, color_mapping, key):
     grouped_df = df.groupby("interval")[sentiments].mean().reset_index()
 
     grouped_df["interval"] = grouped_df["interval"].astype(str)
+    st.write(grouped_df)
+    st.title('TEST')
 
     fig = go.Figure()
 
@@ -141,7 +158,7 @@ def generate_sentiments_per_month(df, sentiments, color_mapping, key):
             go.Bar(
                 x=grouped_df["interval"],
                 y=grouped_df[sentiment],
-                name=sentiment,
+                name=['positive', 'negative'],
                 marker_color=color_mapping[sentiment],
             )
         )
