@@ -1,7 +1,7 @@
 # PDF Images
 
 ## Page 1
-![Page 1](pdf_images/Page (1).jpg)
+![Page 1](pdf_images/page(1).jpg)
 
 ## Page 2
 ![Page 2](pdf_images/Page%20(2).jpg)
